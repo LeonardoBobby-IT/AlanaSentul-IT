@@ -1,0 +1,6 @@
+{
+  "name": "IT Daily Checklist & Operations Monitor",
+  "description": "Enterprise IT Daily Checklist application with customizable SOP items, compliance point scoring, automated executive reporting, and instant crucial failure alerts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
