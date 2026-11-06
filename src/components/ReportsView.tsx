@@ -11,15 +11,18 @@ import {
   Calendar,
   Building2,
   PieChart,
-  BarChart3
+  BarChart3,
+  Lock
 } from 'lucide-react';
 import { InspectionRecord, ChecklistItem, NotificationSettings } from '../types';
 import { notificationService } from '../services/notificationService';
+import { AuthorizedUser } from '../services/authService';
 
 interface ReportsViewProps {
   inspections: InspectionRecord[];
   items: ChecklistItem[];
   settings: NotificationSettings;
+  currentUser: AuthorizedUser;
   selectedInspectionId?: string;
   onUpdateInspection: (record: InspectionRecord) => void;
 }
@@ -28,6 +31,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   inspections,
   items,
   settings,
+  currentUser,
   selectedInspectionId,
   onUpdateInspection,
 }) => {
@@ -156,11 +160,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
   // Manager Verification
   const handleVerifyReport = () => {
+    if (!currentUser.isSuperuser) return;
     const updated: InspectionRecord = {
       ...currentInspection,
       status: 'verified',
-      verifiedBy: 'Sentul IT Manager',
-      verificationNotes: verificationNote || 'Approved and digitally verified by IT Manager in accordance with operational SLA.',
+      verifiedBy: `${currentUser.name} (${currentUser.role})`,
+      verificationNotes: verificationNote || `Approved and digitally verified by ${currentUser.name} in accordance with operational SLA.`,
       updatedAt: new Date().toISOString(),
     };
     onUpdateInspection(updated);
@@ -280,24 +285,24 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </div>
           </div>
 
-          {/* Audit Metadata Strip with No. Pengisian, Jam, Tanggal */}
+          {/* Audit Metadata Strip with Document Ref No, Date, Time */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-6 pt-4 border-t border-slate-200 text-xs">
-            {/* No. Pengisian / Reference */}
+            {/* Document Ref No */}
             <div>
               <span className="text-slate-400 block font-normal flex items-center gap-1">
                 <Hash className="w-3 h-3 text-slate-400" />
-                <span>No. Pengisian</span>
+                <span>Document Ref No.</span>
               </span>
               <span className="font-bold text-slate-900 font-mono">
                 {currentInspection.inspectionNumber || 'ITDC-REF-001'}
               </span>
             </div>
 
-            {/* Tanggal & Jam Pengisian */}
+            {/* Date & Time */}
             <div>
               <span className="text-slate-400 block font-normal flex items-center gap-1">
                 <Clock className="w-3 h-3 text-slate-400" />
-                <span>Tanggal & Jam</span>
+                <span>Date & Time</span>
               </span>
               <span className="font-semibold text-slate-900 font-mono">
                 {currentInspection.date} {currentInspection.inspectionTime ? `· ${currentInspection.inspectionTime}` : ''}
@@ -306,7 +311,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
             {/* Shift */}
             <div>
-              <span className="text-slate-400 block font-normal">Shift Operasional</span>
+              <span className="text-slate-400 block font-normal">Operational Shift</span>
               <span className="font-semibold text-slate-900">
                 {currentInspection.shift} Shift
               </span>
@@ -314,7 +319,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
             {/* Inspector */}
             <div>
-              <span className="text-slate-400 block font-normal">Petugas Pemeriksa</span>
+              <span className="text-slate-400 block font-normal">Assigned Inspector</span>
               <span className="font-semibold text-slate-900">
                 {currentInspection.inspectorName} ({currentInspection.inspectorRole})
               </span>
@@ -374,23 +379,23 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
           {/* Key Summary 2 */}
           <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200 flex flex-col justify-between">
-            <span className="text-xs text-emerald-800 uppercase font-bold block">Status Kepatuhan</span>
+            <span className="text-xs text-emerald-800 uppercase font-bold block">Compliance Status</span>
             <div className="text-2xl font-bold font-mono text-emerald-700">
               {currentInspection.compliancePercentage >= 90 ? 'PASSED (EXCELLENT)' : 'NEEDS ATTENTION'}
             </div>
             <span className="text-xs text-emerald-700">
-              Target minimum SLA hotel: 90.0%
+              Hospitality SLA target: 90.0%
             </span>
           </div>
 
           {/* Key Summary 3 */}
           <div className="p-4 rounded-xl bg-rose-50/60 border border-rose-200 flex flex-col justify-between">
-            <span className="text-xs text-rose-800 uppercase font-bold block">Temuan Krusial (Zero-Tolerance)</span>
+            <span className="text-xs text-rose-800 uppercase font-bold block">Crucial Findings (Zero-Tolerance)</span>
             <div className="text-2xl font-bold font-mono text-rose-700">
               {currentInspection.crucialViolationsCount === 0 ? '0 (Nominal)' : `${currentInspection.crucialViolationsCount} Critical`}
             </div>
             <span className="text-xs text-rose-700">
-              {currentInspection.crucialViolationsCount === 0 ? 'Core PMS & ISP aman terkendali' : 'Tindakan eskalasi aktif'}
+              {currentInspection.crucialViolationsCount === 0 ? 'Core PMS & ISP fully nominal' : 'Active remediation required'}
             </span>
           </div>
         </div>
@@ -399,20 +404,20 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         <div className="space-y-3">
           <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide border-b border-slate-200 pb-1.5 flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-slate-700" />
-            <span>1. Ringkasan Kepatuhan per Kategori Sistem & Diagram Hasil</span>
+            <span>1. Category Compliance Summary & Results Chart</span>
           </h2>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border border-slate-200">
               <thead className="bg-slate-100 text-slate-700 font-semibold uppercase tracking-wider text-[10px]">
                 <tr>
-                  <th className="py-2.5 px-3 border-b border-slate-200">Kategori Infrastruktur</th>
-                  <th className="py-2.5 px-3 border-b border-slate-200 text-center">Total Item</th>
+                  <th className="py-2.5 px-3 border-b border-slate-200">Infrastructure Category</th>
+                  <th className="py-2.5 px-3 border-b border-slate-200 text-center">Total Items</th>
                   <th className="py-2.5 px-3 border-b border-slate-200 text-center">Comply</th>
                   <th className="py-2.5 px-3 border-b border-slate-200 text-center">Not Comply</th>
-                  <th className="py-2.5 px-3 border-b border-slate-200 text-right">Poin</th>
-                  <th className="py-2.5 px-3 border-b border-slate-200 w-36">Diagram Hasil</th>
-                  <th className="py-2.5 px-3 border-b border-slate-200 text-right">Persentase</th>
+                  <th className="py-2.5 px-3 border-b border-slate-200 text-right">Points</th>
+                  <th className="py-2.5 px-3 border-b border-slate-200 w-36">Results Chart</th>
+                  <th className="py-2.5 px-3 border-b border-slate-200 text-right">Compliance Rate</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -445,29 +450,29 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </div>
         </div>
 
-        {/* Section 2: Defisiensi & Rencana Tindakan */}
+        {/* Section 2: Deficiencies & Corrective Action Matrix */}
         <div className="space-y-3">
           <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide border-b border-slate-200 pb-1.5 flex items-center justify-between">
-            <span>2. Matriks Temuan Not Comply & Rencana Tindakan (Corrective Actions)</span>
+            <span>2. Deficiencies & Corrective Action Matrix (Not Comply)</span>
             <span className="text-xs font-mono font-normal text-slate-500">
-              {notComplyItems.length} Temuan Aktif
+              {notComplyItems.length} Active Findings
             </span>
           </h2>
 
           {notComplyItems.length === 0 ? (
             <div className="p-4 bg-emerald-50/40 rounded-xl border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-emerald-600" />
-              <span>Zero operational deficiencies. Seluruh parameter checklist memenuhi standar (100% Comply).</span>
+              <span>Zero operational deficiencies. All inspected parameters comply 100% with standard operating procedures.</span>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border border-rose-200">
                 <thead className="bg-rose-50/70 text-rose-950 font-semibold uppercase tracking-wider text-[10px]">
                   <tr>
-                    <th className="py-2.5 px-3 border-b border-rose-200">Item Checklist</th>
+                    <th className="py-2.5 px-3 border-b border-rose-200">Checklist Parameter</th>
                     <th className="py-2.5 px-3 border-b border-rose-200">Severity</th>
-                    <th className="py-2.5 px-3 border-b border-rose-200">Catatan Temuan / Reading</th>
-                    <th className="py-2.5 px-3 border-b border-rose-200">Rencana Tindakan Korektif</th>
+                    <th className="py-2.5 px-3 border-b border-rose-200">Findings & Remarks</th>
+                    <th className="py-2.5 px-3 border-b border-rose-200">Corrective Action Plan</th>
                     <th className="py-2.5 px-3 border-b border-rose-200">Assigned PIC</th>
                   </tr>
                 </thead>
@@ -507,7 +512,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         {/* Section 3: Detailed Checklist Audit Sheet with Remarks for EVERY item */}
         <div className="space-y-3">
           <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide border-b border-slate-200 pb-1.5">
-            3. Rincian Lengkap Hasil Pemeriksaan & Remarks (Audit Sheet)
+            3. Detailed Inspection Parameters & Remarks (Audit Sheet)
           </h2>
 
           <div className="overflow-x-auto">
@@ -516,10 +521,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <tr>
                   <th className="py-2 px-2.5 border-b border-slate-200 w-8 text-center">No</th>
                   <th className="py-2 px-3 border-b border-slate-200">Parameter Scope</th>
-                  <th className="py-2 px-3 border-b border-slate-200">Kategori</th>
-                  <th className="py-2 px-3 border-b border-slate-200 text-center">Bobot</th>
+                  <th className="py-2 px-3 border-b border-slate-200">Category</th>
+                  <th className="py-2 px-3 border-b border-slate-200 text-center">Weight</th>
                   <th className="py-2 px-3 border-b border-slate-200 text-center">Status</th>
-                  <th className="py-2 px-3 border-b border-slate-200">Remarks / Nilai Pengukuran</th>
+                  <th className="py-2 px-3 border-b border-slate-200">Remarks / Readings</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -568,7 +573,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         {/* Section 4: General Notes */}
         {currentInspection.notes && (
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-700">
-            <span className="font-bold text-slate-900 block mb-1">Catatan Handover & Operasional Harian:</span>
+            <span className="font-bold text-slate-900 block mb-1">Operational & Handover Remarks:</span>
             <p className="leading-relaxed">{currentInspection.notes}</p>
           </div>
         )}
@@ -577,7 +582,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         <div className="pt-6 border-t-2 border-slate-900">
           <div className="grid grid-cols-3 gap-8 text-center text-xs">
             <div>
-              <span className="text-slate-500 block mb-12">Disiapkan Oleh (IT Inspector),</span>
+              <span className="text-slate-500 block mb-12">Prepared By (IT Inspector),</span>
               <div className="border-b border-slate-400 pb-1 font-bold text-slate-900">
                 {currentInspection.inspectorName}
               </div>
@@ -587,7 +592,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </div>
 
             <div>
-              <span className="text-slate-500 block mb-12">Diverifikasi Oleh (IT Manager),</span>
+              <span className="text-slate-500 block mb-12">Verified By (IT Manager),</span>
               <div className="border-b border-slate-400 pb-1 font-bold text-slate-900">
                 {currentInspection.verifiedBy || '( ________________________ )'}
               </div>
@@ -597,7 +602,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </div>
 
             <div>
-              <span className="text-slate-500 block mb-12">Mengetahui (GM / Financial Controller),</span>
+              <span className="text-slate-500 block mb-12">Acknowledged By (GM / Financial Controller),</span>
               <div className="border-b border-slate-400 pb-1 font-bold text-slate-900">
                 ( ________________________ )
               </div>
@@ -613,8 +618,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       {currentInspection.status !== 'verified' && (
         <div className="no-print bg-white p-5 rounded-xl border border-indigo-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-0.5">
-            <h3 className="text-sm font-bold text-slate-900">
-              Manager Verification Sign-Off
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-indigo-600" />
+              <span>Manager Verification Sign-Off</span>
             </h3>
             <p className="text-xs text-slate-500">
               Provide formal digital approval for inspection report <span className="font-mono font-bold text-slate-800">{currentInspection.inspectionNumber}</span>.
@@ -622,13 +628,20 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleVerifyReport}
-              className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
-            >
-              <CheckCheck className="w-4 h-4" />
-              <span>Verify & Approve Report</span>
-            </button>
+            {currentUser.isSuperuser ? (
+              <button
+                onClick={handleVerifyReport}
+                className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+              >
+                <CheckCheck className="w-4 h-4" />
+                <span>Verify & Approve Report (as {currentUser.name})</span>
+              </button>
+            ) : (
+              <div className="px-3.5 py-2 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+                <Lock className="w-4 h-4 text-amber-600" />
+                <span>Verification Sign-Off Restricted to Superusers</span>
+              </div>
+            )}
           </div>
         </div>
       )}

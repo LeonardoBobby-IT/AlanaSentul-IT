@@ -12,6 +12,7 @@ import { AlertsView } from './components/AlertsView';
 import { SettingsModal } from './components/SettingsModal';
 import { CrucialAlertModal } from './components/CrucialAlertModal';
 import { storageService } from './services/storageService';
+import { authService, AuthorizedUser } from './services/authService';
 import { ChecklistItem, InspectionRecord, NotificationSettings, CrucialAlert } from './types';
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
   const [inspections, setInspections] = useState<InspectionRecord[]>(() => storageService.getInspections());
   const [alerts, setAlerts] = useState<CrucialAlert[]>(() => storageService.getAlerts());
   const [settings, setSettings] = useState<NotificationSettings>(() => storageService.getSettings());
+  const [currentUser, setCurrentUser] = useState<AuthorizedUser>(() => authService.getCurrentUser());
 
   // Deep linking for reports
   const [selectedReportId, setSelectedReportId] = useState<string>('');
@@ -30,8 +32,29 @@ export default function App() {
   // Settings modal state
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
+  // Handle switching active authenticated user / role
+  const handleSwitchUser = (email: string) => {
+    const updated = authService.switchUserByEmail(email);
+    setCurrentUser(updated);
+  };
+
+  // Save checklist items
+  const handleSaveItems = (newItems: ChecklistItem[]) => {
+    if (!currentUser.isSuperuser) return;
+    setItems(newItems);
+    storageService.saveItems(newItems);
+  };
+
+  // Reset items to default
+  const handleResetToDefault = () => {
+    if (!currentUser.isSuperuser) return;
+    const defaultItems = storageService.resetItemsToDefault();
+    setItems(defaultItems);
+  };
+
   // Save Inspection
   const handleSaveInspection = (record: InspectionRecord) => {
+    if (!currentUser.isSuperuser) return;
     storageService.saveInspection(record);
     const updatedInspections = storageService.getInspections();
     setInspections(updatedInspections);
@@ -40,6 +63,7 @@ export default function App() {
 
   // Update existing Inspection (e.g., manager verification)
   const handleUpdateInspection = (record: InspectionRecord) => {
+    if (!currentUser.isSuperuser) return;
     storageService.saveInspection(record);
     const updatedInspections = storageService.getInspections();
     setInspections(updatedInspections);
@@ -54,18 +78,21 @@ export default function App() {
 
   // Acknowledge alert
   const handleAcknowledgeAlert = (id: string) => {
+    if (!currentUser.isSuperuser) return;
     storageService.acknowledgeAlert(id);
     setAlerts(storageService.getAlerts());
   };
 
   // Clear all alerts
   const handleClearAllAlerts = () => {
+    if (!currentUser.isSuperuser) return;
     storageService.clearAllAlerts();
     setAlerts([]);
   };
 
   // Save Settings
   const handleSaveSettings = (newSettings: NotificationSettings) => {
+    if (!currentUser.isSuperuser) return;
     setSettings(newSettings);
     storageService.saveSettings(newSettings);
   };
@@ -89,6 +116,8 @@ export default function App() {
         onNewChecklistClick={() => setActiveTab('checklist')}
         logoUrl={settings.logoUrl}
         propertyName={settings.propertyName}
+        currentUser={currentUser}
+        onSwitchUser={handleSwitchUser}
       />
 
       {/* Main Viewport Container */}
@@ -99,6 +128,7 @@ export default function App() {
             items={items}
             activeAlerts={alerts.filter((a) => !a.acknowledged)}
             settings={settings}
+            currentUser={currentUser}
             onStartChecklist={() => setActiveTab('checklist')}
             onViewReport={handleViewReport}
             onAcknowledgeAlert={handleAcknowledgeAlert}
@@ -109,8 +139,11 @@ export default function App() {
           <ChecklistExecutionView
             items={items}
             settings={settings}
+            currentUser={currentUser}
             onSaveInspection={handleSaveInspection}
             onTriggerCrucialAlert={handleTriggerCrucialAlert}
+            onUpdateItems={handleSaveItems}
+            onResetItemsToDefault={handleResetToDefault}
             onViewReport={handleViewReport}
           />
         )}
@@ -120,6 +153,7 @@ export default function App() {
             inspections={inspections}
             items={items}
             settings={settings}
+            currentUser={currentUser}
             selectedInspectionId={selectedReportId}
             onUpdateInspection={handleUpdateInspection}
           />
@@ -129,6 +163,7 @@ export default function App() {
           <AlertsView
             alerts={alerts}
             settings={settings}
+            currentUser={currentUser}
             onAcknowledgeAlert={handleAcknowledgeAlert}
             onClearAllAlerts={handleClearAllAlerts}
           />

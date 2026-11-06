@@ -8,10 +8,12 @@ import {
 } from 'lucide-react';
 import { CrucialAlert, NotificationSettings } from '../types';
 import { notificationService } from '../services/notificationService';
+import { AuthorizedUser } from '../services/authService';
 
 interface AlertsViewProps {
   alerts: CrucialAlert[];
   settings: NotificationSettings;
+  currentUser: AuthorizedUser;
   onAcknowledgeAlert: (id: string) => void;
   onClearAllAlerts: () => void;
 }
@@ -19,6 +21,7 @@ interface AlertsViewProps {
 export const AlertsView: React.FC<AlertsViewProps> = ({
   alerts,
   settings,
+  currentUser,
   onAcknowledgeAlert,
   onClearAllAlerts,
 }) => {
@@ -57,7 +60,7 @@ export const AlertsView: React.FC<AlertsViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {alerts.length > 0 && (
+          {currentUser.isSuperuser && alerts.length > 0 && (
             <button
               onClick={() => {
                 if (window.confirm('Clear all historical alerts and incident logs?')) {
@@ -184,12 +187,18 @@ export const AlertsView: React.FC<AlertsViewProps> = ({
                 </button>
 
                 {!alert.acknowledged ? (
-                  <button
-                    onClick={() => onAcknowledgeAlert(alert.id)}
-                    className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors"
-                  >
-                    Mark Resolved
-                  </button>
+                  currentUser.isSuperuser ? (
+                    <button
+                      onClick={() => onAcknowledgeAlert(alert.id)}
+                      className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors"
+                    >
+                      Mark Resolved
+                    </button>
+                  ) : (
+                    <span className="text-xs text-amber-700 bg-amber-50 px-2.5 py-1 rounded border border-amber-200 font-medium">
+                      Pending Resolution
+                    </span>
+                  )
                 ) : (
                   <span className="text-xs text-emerald-600 font-medium flex items-center gap-1 px-2 py-1 bg-emerald-50 rounded">
                     <CheckCheck className="w-3.5 h-3.5" />
