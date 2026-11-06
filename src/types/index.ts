@@ -24,12 +24,20 @@ export interface ChecklistAnswer {
   evidencePhoto?: string; // base64 data url or note
 }
 
+export interface InspectorProfile {
+  id: string;
+  name: string;
+  role: string;
+  email?: string;
+  isCustom?: boolean;
+}
+
 export interface InspectionRecord {
   id: string;
   inspectionNumber: string; // Document / Reference Number (No. Pengisian)
   date: string; // YYYY-MM-DD
   inspectionTime: string; // Exact time of inspection (e.g. 08:35:12)
-  shift: 'Morning' | 'Middle' | 'Night' | 'Full Day';
+  shift: 'Morning Shift' | 'Afternoon Shift' | 'All Day Routine' | string;
   inspectorName: string;
   inspectorRole: string;
   propertyLocation: string;

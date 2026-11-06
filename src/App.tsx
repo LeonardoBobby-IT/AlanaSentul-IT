@@ -11,6 +11,7 @@ import { ReportsView } from './components/ReportsView';
 import { AlertsView } from './components/AlertsView';
 import { SettingsModal } from './components/SettingsModal';
 import { CrucialAlertModal } from './components/CrucialAlertModal';
+import { LoginGate } from './components/LoginGate';
 import { storageService } from './services/storageService';
 import { authService, AuthorizedUser } from './services/authService';
 import { ChecklistItem, InspectionRecord, NotificationSettings, CrucialAlert } from './types';
@@ -21,7 +22,7 @@ export default function App() {
   const [inspections, setInspections] = useState<InspectionRecord[]>(() => storageService.getInspections());
   const [alerts, setAlerts] = useState<CrucialAlert[]>(() => storageService.getAlerts());
   const [settings, setSettings] = useState<NotificationSettings>(() => storageService.getSettings());
-  const [currentUser, setCurrentUser] = useState<AuthorizedUser>(() => authService.getCurrentUser());
+  const [currentUser, setCurrentUser] = useState<AuthorizedUser | null>(() => authService.getCurrentUser());
 
   // Deep linking for reports
   const [selectedReportId, setSelectedReportId] = useState<string>('');
@@ -32,6 +33,17 @@ export default function App() {
   // Settings modal state
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
+  // Authentication Login & Logout handlers
+  const handleLogin = (email: string) => {
+    const user = authService.loginWithEmail(email);
+    setCurrentUser(user);
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    setCurrentUser(null);
+  };
+
   // Handle switching active authenticated user / role
   const handleSwitchUser = (email: string) => {
     const updated = authService.switchUserByEmail(email);
@@ -40,21 +52,21 @@ export default function App() {
 
   // Save checklist items
   const handleSaveItems = (newItems: ChecklistItem[]) => {
-    if (!currentUser.isSuperuser) return;
+    if (!currentUser?.isSuperuser) return;
     setItems(newItems);
     storageService.saveItems(newItems);
   };
 
   // Reset items to default
   const handleResetToDefault = () => {
-    if (!currentUser.isSuperuser) return;
+    if (!currentUser?.isSuperuser) return;
     const defaultItems = storageService.resetItemsToDefault();
     setItems(defaultItems);
   };
 
   // Save Inspection
   const handleSaveInspection = (record: InspectionRecord) => {
-    if (!currentUser.isSuperuser) return;
+    if (!currentUser?.isSuperuser) return;
     storageService.saveInspection(record);
     const updatedInspections = storageService.getInspections();
     setInspections(updatedInspections);
@@ -63,7 +75,7 @@ export default function App() {
 
   // Update existing Inspection (e.g., manager verification)
   const handleUpdateInspection = (record: InspectionRecord) => {
-    if (!currentUser.isSuperuser) return;
+    if (!currentUser?.isSuperuser) return;
     storageService.saveInspection(record);
     const updatedInspections = storageService.getInspections();
     setInspections(updatedInspections);
@@ -78,21 +90,21 @@ export default function App() {
 
   // Acknowledge alert
   const handleAcknowledgeAlert = (id: string) => {
-    if (!currentUser.isSuperuser) return;
+    if (!currentUser?.isSuperuser) return;
     storageService.acknowledgeAlert(id);
     setAlerts(storageService.getAlerts());
   };
 
   // Clear all alerts
   const handleClearAllAlerts = () => {
-    if (!currentUser.isSuperuser) return;
+    if (!currentUser?.isSuperuser) return;
     storageService.clearAllAlerts();
     setAlerts([]);
   };
 
   // Save Settings
   const handleSaveSettings = (newSettings: NotificationSettings) => {
-    if (!currentUser.isSuperuser) return;
+    if (!currentUser?.isSuperuser) return;
     setSettings(newSettings);
     storageService.saveSettings(newSettings);
   };
@@ -104,6 +116,17 @@ export default function App() {
   };
 
   const unreadAlertsCount = alerts.filter((a) => !a.acknowledged).length;
+
+  // Strict Authentication Gate - No access without email login
+  if (!currentUser) {
+    return (
+      <LoginGate
+        onLogin={handleLogin}
+        logoUrl={settings.logoUrl}
+        propertyName={settings.propertyName}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-900 font-sans antialiased flex flex-col">
@@ -118,6 +141,7 @@ export default function App() {
         propertyName={settings.propertyName}
         currentUser={currentUser}
         onSwitchUser={handleSwitchUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Viewport Container */}

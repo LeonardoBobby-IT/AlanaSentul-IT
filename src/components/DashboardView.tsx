@@ -204,7 +204,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     : 'Status: All Core Systems Nominal'}
                 </span>
                 <span className="text-xs opacity-75 font-mono tabular-nums">
-                  · {latestInspection ? `${latestInspection.inspectionNumber || 'ITDC'} (${latestInspection.date} ${latestInspection.inspectionTime || ''})` : 'No inspection recorded'}
+                  · {latestInspection ? `${latestInspection.inspectionNumber || 'ITDC'} (${latestInspection.date} ${latestInspection.inspectionTime || ''})` : 'No checklist recorded'}
                 </span>
               </div>
               <p className="text-sm font-medium mt-0.5">
@@ -524,12 +524,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <span aria-hidden="true">·</span>
                   <span className="font-mono tabular-nums">{insp.date} {insp.inspectionTime ? `at ${insp.inspectionTime}` : ''}</span>
                   <span aria-hidden="true">·</span>
-                  <span>Shift {insp.shift}</span>
+                  <span>{insp.shift.includes('Shift') || insp.shift.includes('Routine') ? insp.shift : `${insp.shift} Shift`}</span>
                   <span aria-hidden="true">·</span>
                   <span>{insp.inspectorName}</span>
                 </div>
                 <p className="text-xs text-slate-600 truncate max-w-md">
-                  {insp.notes || 'Routine daily inspection verified.'}
+                  {insp.notes || 'Routine daily checklist verified.'}
                 </p>
               </div>
 

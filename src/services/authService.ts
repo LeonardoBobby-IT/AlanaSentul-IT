@@ -13,7 +13,7 @@ export const SUPERUSERS: AuthorizedUser[] = [
     isSuperuser: true,
   },
   {
-    name: 'Muchammed Adity',
+    name: 'Muchammed Aditya',
     role: 'IT Coordinator',
     email: 'sentulitc@alanahotels.com',
     isSuperuser: true,
@@ -27,7 +27,7 @@ export const READ_ONLY_ROLE = {
   isSuperuser: false,
 };
 
-const STORAGE_AUTH_KEY = 'it_checklist_auth_user_v1';
+const STORAGE_AUTH_KEY = 'it_checklist_auth_user_v2';
 
 export const authService = {
   getSuperusers(): AuthorizedUser[] {
@@ -41,7 +41,8 @@ export const authService = {
     return SUPERUSERS.some((u) => u.email.toLowerCase() === normalized);
   },
 
-  getCurrentUser(): AuthorizedUser {
+  // Return logged-in user or null if not yet authenticated
+  getCurrentUser(): AuthorizedUser | null {
     try {
       const stored = localStorage.getItem(STORAGE_AUTH_KEY);
       if (stored) {
@@ -57,7 +58,7 @@ export const authService = {
           return {
             name: parsed.name || 'Viewer',
             role: 'Viewer / Read-Only',
-            email: parsed.email,
+            email: parsed.email.trim().toLowerCase(),
             isSuperuser: false,
           };
         }
@@ -65,33 +66,48 @@ export const authService = {
     } catch (e) {
       console.warn('Failed to parse stored auth user', e);
     }
-
-    // Default to Leonardo Bobby (first superuser) for the session owner
-    const defaultUser = SUPERUSERS[0];
-    localStorage.setItem(STORAGE_AUTH_KEY, JSON.stringify(defaultUser));
-    return defaultUser;
+    return null;
   },
 
-  setCurrentUser(user: AuthorizedUser): void {
-    localStorage.setItem(STORAGE_AUTH_KEY, JSON.stringify(user));
+  setCurrentUser(user: AuthorizedUser | null): void {
+    if (user) {
+      localStorage.setItem(STORAGE_AUTH_KEY, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(STORAGE_AUTH_KEY);
+    }
   },
 
-  switchUserByEmail(email: string): AuthorizedUser {
-    const matched = SUPERUSERS.find(
-      (su) => su.email.toLowerCase() === email.trim().toLowerCase()
-    );
+  loginWithEmail(rawEmail: string): AuthorizedUser {
+    const email = rawEmail.trim().toLowerCase();
+    const matched = SUPERUSERS.find((su) => su.email.toLowerCase() === email);
     if (matched) {
       this.setCurrentUser(matched);
       return matched;
     }
 
+    // Default viewer name formatted from email address
+    const namePart = email.split('@')[0] || 'Auditor';
+    const formattedName = namePart
+      .split(/[._-]/)
+      .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+      .join(' ');
+
     const viewerUser: AuthorizedUser = {
-      name: email.split('@')[0] || 'Hotel Auditor',
+      name: `${formattedName} (Viewer)`,
       role: 'Viewer / Read-Only',
-      email: email.trim().toLowerCase(),
+      email,
       isSuperuser: false,
     };
     this.setCurrentUser(viewerUser);
     return viewerUser;
   },
+
+  logout(): void {
+    localStorage.removeItem(STORAGE_AUTH_KEY);
+  },
+
+  switchUserByEmail(email: string): AuthorizedUser {
+    return this.loginWithEmail(email);
+  },
 };
+

@@ -1,4 +1,4 @@
-import { ChecklistItem, InspectionRecord, NotificationSettings, CrucialAlert } from '../types';
+import { ChecklistItem, InspectionRecord, NotificationSettings, CrucialAlert, InspectorProfile } from '../types';
 import { DEFAULT_CHECKLIST_ITEMS } from '../data/defaultChecklist';
 
 const STORAGE_KEYS = {
@@ -7,7 +7,25 @@ const STORAGE_KEYS = {
   SETTINGS: 'it_checklist_settings_v2',
   ALERTS: 'it_checklist_alerts_v2',
   ACTIVE_DRAFT: 'it_checklist_active_draft_v2',
+  CUSTOM_INSPECTORS: 'it_checklist_custom_inspectors_v2',
 };
+
+export const FIXED_INSPECTORS: InspectorProfile[] = [
+  {
+    id: 'fixed-leonardo',
+    name: 'Leonardo Bobby',
+    role: 'Cluster IT Manager',
+    email: 'sentulitm@alanahotels.com',
+    isCustom: false,
+  },
+  {
+    id: 'fixed-aditya',
+    name: 'Muchammed Aditya',
+    role: 'IT Coordinator',
+    email: 'sentulitc@alanahotels.com',
+    isCustom: false,
+  },
+];
 
 const DEFAULT_LOGO_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 48" fill="none"><rect width="48" height="48" rx="10" fill="%230F172A"/><path d="M14 24L20 30L34 16" stroke="%2334D399" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><text x="56" y="24" fill="%230F172A" font-family="system-ui, sans-serif" font-size="14" font-weight="800" letter-spacing="-0.3">THE ALANA</text><text x="56" y="38" fill="%2364748B" font-family="system-ui, sans-serif" font-size="9" font-weight="600" letter-spacing="0.5">HOTEL &amp; CONFERENCE</text></svg>`;
 
@@ -28,7 +46,7 @@ function generateSeedInspections(items: ChecklistItem[]): InspectionRecord[] {
 
   const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
-  // 1. Yesterday (Completed, 96.2% score, 1 minor non-crucial finding)
+  // 1. Yesterday (Completed, 96.2% score)
   const d1 = new Date(today);
   d1.setDate(d1.getDate() - 1);
   const answers1: Record<string, any> = {};
@@ -60,9 +78,9 @@ function generateSeedInspections(items: ChecklistItem[]): InspectionRecord[] {
     inspectionNumber: `ITDC-${formatDate(d1).replace(/-/g, '')}-001`,
     date: formatDate(d1),
     inspectionTime: '08:30:24',
-    shift: 'Morning',
-    inspectorName: 'Bayu Pratama',
-    inspectorRole: 'IT Operations Specialist',
+    shift: 'Morning Shift',
+    inspectorName: 'Muchammed Aditya',
+    inspectorRole: 'IT Coordinator',
     propertyLocation: 'The Alana Hotel Sentul',
     answers: answers1,
     status: 'completed',
@@ -73,7 +91,7 @@ function generateSeedInspections(items: ChecklistItem[]): InspectionRecord[] {
     notes: 'Overall server room and PMS core infrastructure fully operational during morning shift.',
     createdAt: `${formatDate(d1)}T08:30:00.000Z`,
     updatedAt: `${formatDate(d1)}T09:15:00.000Z`,
-    verifiedBy: 'Sentul IT Manager',
+    verifiedBy: 'Leonardo Bobby (Cluster IT Manager)',
   });
 
   // 2. 2 days ago (Completed, 100% score)
@@ -98,9 +116,9 @@ function generateSeedInspections(items: ChecklistItem[]): InspectionRecord[] {
     inspectionNumber: `ITDC-${formatDate(d2).replace(/-/g, '')}-001`,
     date: formatDate(d2),
     inspectionTime: '08:15:40',
-    shift: 'Morning',
-    inspectorName: 'Rian Hidayat',
-    inspectorRole: 'Senior IT Specialist',
+    shift: 'All Day Routine',
+    inspectorName: 'Leonardo Bobby',
+    inspectorRole: 'Cluster IT Manager',
     propertyLocation: 'The Alana Hotel Sentul',
     answers: answers2,
     status: 'verified',
@@ -111,10 +129,10 @@ function generateSeedInspections(items: ChecklistItem[]): InspectionRecord[] {
     notes: 'Weekly audit across all server racks and switch closets 100% compliant. Cloud replication verified.',
     createdAt: `${formatDate(d2)}T08:15:00.000Z`,
     updatedAt: `${formatDate(d2)}T09:00:00.000Z`,
-    verifiedBy: 'Sentul IT Manager',
+    verifiedBy: 'Leonardo Bobby (Cluster IT Manager)',
   });
 
-  // 3. 3 days ago (Completed, 91.5% score, 1 crucial alert regarding AC precision)
+  // 3. 3 days ago (Completed, 91.5% score)
   const d3 = new Date(today);
   d3.setDate(d3.getDate() - 3);
   const answers3: Record<string, any> = {};
@@ -146,10 +164,10 @@ function generateSeedInspections(items: ChecklistItem[]): InspectionRecord[] {
     id: `insp-${formatDate(d3)}-morning`,
     inspectionNumber: `ITDC-${formatDate(d3).replace(/-/g, '')}-001`,
     date: formatDate(d3),
-    inspectionTime: '08:45:12',
-    shift: 'Morning',
-    inspectorName: 'Bayu Pratama',
-    inspectorRole: 'IT Operations Specialist',
+    inspectionTime: '14:45:12',
+    shift: 'Afternoon Shift',
+    inspectorName: 'Muchammed Aditya',
+    inspectorRole: 'IT Coordinator',
     propertyLocation: 'The Alana Hotel Sentul',
     answers: answers3,
     status: 'completed',
@@ -158,9 +176,9 @@ function generateSeedInspections(items: ChecklistItem[]): InspectionRecord[] {
     compliancePercentage: Math.round((earnedPts3 / totalPts3) * 1000) / 10,
     crucialViolationsCount: 1,
     notes: 'Server room temperature maintained at 20.2°C by primary AC unit. Backup AC serviced.',
-    createdAt: `${formatDate(d3)}T08:45:00.000Z`,
-    updatedAt: `${formatDate(d3)}T09:30:00.000Z`,
-    verifiedBy: 'Sentul IT Manager',
+    createdAt: `${formatDate(d3)}T14:45:00.000Z`,
+    updatedAt: `${formatDate(d3)}T15:30:00.000Z`,
+    verifiedBy: 'Leonardo Bobby (Cluster IT Manager)',
   });
 
   return seedRecords;
@@ -285,6 +303,46 @@ export const storageService = {
 
   saveSettings(settings: NotificationSettings): void {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+  },
+
+  // Inspectors Management (Fixed Leonardo Bobby & Muchammed Aditya + Custom)
+  getInspectors(): InspectorProfile[] {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.CUSTOM_INSPECTORS);
+      const customList: InspectorProfile[] = data ? JSON.parse(data) : [];
+      return [...FIXED_INSPECTORS, ...customList];
+    } catch (e) {
+      console.warn('Failed reading custom inspectors:', e);
+      return [...FIXED_INSPECTORS];
+    }
+  },
+
+  getCustomInspectors(): InspectorProfile[] {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.CUSTOM_INSPECTORS);
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  addCustomInspector(name: string, role: string): InspectorProfile {
+    const customList = this.getCustomInspectors();
+    const newInspector: InspectorProfile = {
+      id: `custom-insp-${Date.now()}`,
+      name: name.trim(),
+      role: role.trim() || 'IT Operations Specialist',
+      isCustom: true,
+    };
+    const updated = [...customList, newInspector];
+    localStorage.setItem(STORAGE_KEYS.CUSTOM_INSPECTORS, JSON.stringify(updated));
+    return newInspector;
+  },
+
+  deleteCustomInspector(id: string): void {
+    // Crucial requirement: only removes from selection list, NEVER deletes any past checklist records!
+    const customList = this.getCustomInspectors().filter((i) => i.id !== id);
+    localStorage.setItem(STORAGE_KEYS.CUSTOM_INSPECTORS, JSON.stringify(customList));
   },
 
   // Export / Import

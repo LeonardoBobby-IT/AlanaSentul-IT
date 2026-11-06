@@ -7,10 +7,11 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
-  ChevronDown,
   UserCheck,
   Lock,
-  Eye
+  Eye,
+  LogOut,
+  ChevronDown
 } from 'lucide-react';
 import { AuthorizedUser } from '../services/authService';
 
@@ -24,6 +25,7 @@ interface NavbarProps {
   propertyName?: string;
   currentUser: AuthorizedUser;
   onSwitchUser: (email: string) => void;
+  onLogout: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -36,13 +38,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   propertyName = 'The Alana Hotel & Conference Center Sentul',
   currentUser,
   onSwitchUser,
+  onLogout,
 }) => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [customEmail, setCustomEmail] = useState('');
 
   const superusers = [
     { name: 'Leonardo Bobby', role: 'Cluster IT Manager', email: 'sentulitm@alanahotels.com' },
-    { name: 'Muchammed Adity', role: 'IT Coordinator', email: 'sentulitc@alanahotels.com' },
+    { name: 'Muchammed Aditya', role: 'IT Coordinator', email: 'sentulitc@alanahotels.com' },
   ];
 
   return (
@@ -232,6 +235,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <div className="text-[10px] text-amber-700 font-medium">Read-Only Mode (Lihat Saja)</div>
                       </div>
                       <Eye className="w-4 h-4 text-amber-600 shrink-0" />
+                    </button>
+                  </div>
+
+                  {/* Sign Out / Exit to Login Gate */}
+                  <div className="border-t border-slate-100 mt-1 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        onLogout();
+                      }}
+                      className="w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-600 flex items-center justify-between transition-colors font-medium"
+                    >
+                      <span>Sign Out / Switch Account</span>
+                      <LogOut className="w-3.5 h-3.5 text-rose-500" />
                     </button>
                   </div>
                 </div>

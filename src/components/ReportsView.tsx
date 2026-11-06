@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Printer, 
   Download, 
@@ -12,8 +12,15 @@ import {
   Building2,
   PieChart,
   BarChart3,
-  Lock
+  Lock,
+  Filter,
+  FileDown,
+  Loader2,
+  TrendingUp,
+  AlertOctagon
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { InspectionRecord, ChecklistItem, NotificationSettings } from '../types';
 import { notificationService } from '../services/notificationService';
 import { AuthorizedUser } from '../services/authService';
@@ -35,24 +42,76 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   selectedInspectionId,
   onUpdateInspection,
 }) => {
+  // Monthly & Yearly Tracking Filter States
+  const availableYears = Array.from(
+    new Set(inspections.map((i) => i.date.split('-')[0]))
+  ).sort((a, b) => b.localeCompare(a));
+
+  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+
+  const MONTHS = [
+    { value: 'all', label: 'All Months' },
+    { value: '01', label: 'January' },
+    { value: '02', label: 'February' },
+    { value: '03', label: 'March' },
+    { value: '04', label: 'April' },
+    { value: '05', label: 'May' },
+    { value: '06', label: 'June' },
+    { value: '07', label: 'July' },
+    { value: '08', label: 'August' },
+    { value: '09', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' },
+  ];
+
+  // Filtered inspections by Month and Year
+  const filteredInspections = inspections.filter((insp) => {
+    const parts = insp.date.split('-');
+    const y = parts[0];
+    const m = parts[1];
+    const matchYear = selectedYear === 'all' || y === selectedYear;
+    const matchMonth = selectedMonth === 'all' || m === selectedMonth;
+    return matchYear && matchMonth;
+  });
+
   const [activeId, setActiveId] = useState<string>(
-    selectedInspectionId || inspections[0]?.id || ''
+    selectedInspectionId || filteredInspections[0]?.id || inspections[0]?.id || ''
   );
+
+  // Sync active inspection when filter changes
+  useEffect(() => {
+    if (filteredInspections.length > 0) {
+      if (!filteredInspections.some((i) => i.id === activeId)) {
+        setActiveId(filteredInspections[0].id);
+      }
+    }
+  }, [selectedYear, selectedMonth, filteredInspections, activeId]);
+
   const [copiedSuccess, setCopiedSuccess] = useState<boolean>(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
   const [verificationNote, setVerificationNote] = useState<string>('');
 
-  const currentInspection = inspections.find((i) => i.id === activeId) || inspections[0];
+  const currentInspection = inspections.find((i) => i.id === activeId) || filteredInspections[0] || inspections[0];
 
   if (!currentInspection) {
     return (
       <div className="p-12 text-center bg-white rounded-xl border border-slate-200">
-        <h3 className="text-base font-semibold text-slate-800">No Reports Available</h3>
+        <h3 className="text-base font-semibold text-slate-800">No Checklist Reports Available</h3>
         <p className="text-xs text-slate-500 mt-1">
-          Perform a daily checklist inspection first to generate automated reports.
+          Perform a daily checklist first to generate automated reports.
         </p>
       </div>
     );
   }
+
+  // Monthly Period Metrics
+  const periodCount = filteredInspections.length;
+  const periodAvgScore = periodCount > 0
+    ? filteredInspections.reduce((acc, cur) => acc + cur.compliancePercentage, 0) / periodCount
+    : 0;
+  const periodCrucialCount = filteredInspections.reduce((acc, cur) => acc + cur.crucialViolationsCount, 0);
 
   // Not Comply items list
   const notComplyItems = items
@@ -98,9 +157,67 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     };
   });
 
-  // Print Handler
+  // Direct PDF Generator using html2canvas & jsPDF
+  const handleDownloadPDF = async () => {
+    const element = document.getElementById('printable-report');
+    if (!element) {
+      window.print();
+      return;
+    }
+
+    try {
+      setIsGeneratingPdf(true);
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      let position = 0;
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      if (pdfHeight > pageHeight) {
+        let heightLeft = pdfHeight;
+        while (heightLeft > 0) {
+          pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+          heightLeft -= pageHeight;
+          if (heightLeft > 0) {
+            position -= pageHeight;
+            pdf.addPage();
+          }
+        }
+      } else {
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      }
+
+      const docRef = currentInspection.inspectionNumber || currentInspection.date;
+      pdf.save(`IT-Daily-Checklist-${docRef}.pdf`);
+    } catch (err) {
+      console.error('PDF generation error, falling back to window.print:', err);
+      window.print();
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  // Browser Print Handler (with fallback to PDF download if blocked)
   const handlePrint = () => {
-    window.print();
+    try {
+      window.print();
+    } catch (e) {
+      handleDownloadPDF();
+    }
   };
 
   // WhatsApp Summary Copy
@@ -178,50 +295,155 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      {/* 1. Header Toolbar (Hidden in Print) */}
-      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-        {/* Inspection Selector Dropdown */}
-        <div className="flex items-center gap-3">
-          <div className="text-xs text-slate-500 font-medium">Select Report:</div>
-          <select
-            value={activeId}
-            onChange={(e) => setActiveId(e.target.value)}
-            className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white"
-          >
-            {inspections.map((insp) => (
-              <option key={insp.id} value={insp.id}>
-                {insp.inspectionNumber || 'ITDC'} · {insp.date} {insp.inspectionTime ? `(${insp.inspectionTime})` : ''} - {insp.shift} ({insp.compliancePercentage.toFixed(1)}%)
-              </option>
-            ))}
-          </select>
+      {/* 1. Monthly & Yearly Tracking Filter Toolbar */}
+      <div className="no-print bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                Monthly &amp; Yearly Report Tracking
+              </h2>
+              <p className="text-xs text-slate-500">
+                Filter and track checklist compliance trends across operational periods.
+              </p>
+            </div>
+          </div>
+
+          {/* Month & Year Selectors */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Year Selector */}
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="text-slate-500 font-medium">Year:</span>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800 text-xs focus:bg-white"
+              >
+                <option value="all">All Years</option>
+                {availableYears.map((yr) => (
+                  <option key={yr} value={yr}>{yr}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Month Selector */}
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="text-slate-500 font-medium">Month:</span>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800 text-xs focus:bg-white"
+              >
+                {MONTHS.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={handleCopyWhatsApp}
-            className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors flex items-center gap-1.5"
-            title="Dispatch Formatted Report Summary via WhatsApp"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>{copiedSuccess ? 'Opened in WhatsApp!' : 'WhatsApp Executive Summary'}</span>
-          </button>
+        {/* Tracking Period Summary Stats Widget */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
+          <div>
+            <span className="text-slate-400 block text-[11px]">Filtered Period</span>
+            <span className="font-bold text-slate-900">
+              {selectedMonth === 'all' ? 'All Months' : MONTHS.find((m) => m.value === selectedMonth)?.label} {selectedYear === 'all' ? 'All Time' : selectedYear}
+            </span>
+          </div>
 
-          <button
-            onClick={handleExportCSV}
-            className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors flex items-center gap-1.5"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Export CSV</span>
-          </button>
+          <div>
+            <span className="text-slate-400 block text-[11px]">Checklists Logged</span>
+            <span className="font-bold text-slate-900 font-mono">
+              {periodCount} Records
+            </span>
+          </div>
 
-          <button
-            onClick={handlePrint}
-            className="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
-          >
-            <Printer className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Print / Save PDF</span>
-          </button>
+          <div>
+            <span className="text-slate-400 block text-[11px]">Period SLA Compliance</span>
+            <span className={`font-bold font-mono ${periodAvgScore >= 90 ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {periodAvgScore.toFixed(1)}% Avg
+            </span>
+          </div>
+
+          <div>
+            <span className="text-slate-400 block text-[11px]">Crucial Incidents</span>
+            <span className={`font-bold font-mono ${periodCrucialCount > 0 ? 'text-rose-600' : 'text-slate-700'}`}>
+              {periodCrucialCount} Crucial Issues
+            </span>
+          </div>
+        </div>
+
+        {/* Checklist Selector Dropdown & Action Buttons */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+          {/* Active Checklist Selector */}
+          <div className="flex items-center gap-2 flex-1">
+            <span className="text-xs text-slate-600 font-semibold shrink-0">Report:</span>
+            <select
+              value={activeId}
+              onChange={(e) => setActiveId(e.target.value)}
+              className="flex-1 px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white truncate"
+            >
+              {filteredInspections.map((insp) => (
+                <option key={insp.id} value={insp.id}>
+                  {insp.inspectionNumber || 'ITDC'} · {insp.date} {insp.inspectionTime ? `(${insp.inspectionTime})` : ''} - {insp.shift} ({insp.compliancePercentage.toFixed(1)}%) - {insp.inspectorName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Action Buttons: Download PDF, Print Dialog, WhatsApp, CSV */}
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            {/* WhatsApp Executive Summary */}
+            <button
+              onClick={handleCopyWhatsApp}
+              className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors flex items-center gap-1.5"
+              title="Dispatch Formatted Report Summary via WhatsApp"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>{copiedSuccess ? 'Opened in WhatsApp!' : 'WhatsApp'}</span>
+            </button>
+
+            {/* CSV Export */}
+            <button
+              onClick={handleExportCSV}
+              className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <span>CSV</span>
+            </button>
+
+            {/* Official PDF Download via html2canvas & jsPDF */}
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isGeneratingPdf}
+              className="px-4 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 disabled:bg-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+              title="Download clean official PDF directly to disk"
+            >
+              {isGeneratingPdf ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                  <span>Generating PDF...</span>
+                </>
+              ) : (
+                <>
+                  <FileDown className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Download PDF</span>
+                </>
+              )}
+            </button>
+
+            {/* Browser Print Dialog */}
+            <button
+              onClick={handlePrint}
+              className="p-1.5 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              title="Open Browser Print Dialog"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -313,7 +535,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <div>
               <span className="text-slate-400 block font-normal">Operational Shift</span>
               <span className="font-semibold text-slate-900">
-                {currentInspection.shift} Shift
+                {currentInspection.shift.includes('Shift') || currentInspection.shift.includes('Routine')
+                  ? currentInspection.shift
+                  : `${currentInspection.shift} Shift`}
               </span>
             </div>
 
@@ -327,7 +551,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
             {/* Verification Status */}
             <div>
-              <span className="text-slate-400 block font-normal">Status Verifikasi</span>
+              <span className="text-slate-400 block font-normal">Verification Status</span>
               <span className="font-semibold text-slate-900 flex items-center gap-1">
                 {currentInspection.status === 'verified' ? (
                   <>

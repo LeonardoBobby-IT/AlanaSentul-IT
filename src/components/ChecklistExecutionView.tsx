@@ -17,10 +17,16 @@ import {
   RotateCcw,
   Lock,
   Eye,
-  ShieldCheck
+  ShieldCheck,
+  Sun,
+  Sunset,
+  Calendar,
+  UserPlus,
+  Users
 } from 'lucide-react';
-import { ChecklistItem, ChecklistAnswer, InspectionRecord, ComplianceStatus, CrucialAlert, NotificationSettings } from '../types';
+import { ChecklistItem, ChecklistAnswer, InspectionRecord, ComplianceStatus, CrucialAlert, NotificationSettings, InspectorProfile } from '../types';
 import { notificationService } from '../services/notificationService';
+import { storageService } from '../services/storageService';
 import { AuthorizedUser } from '../services/authService';
 
 interface ChecklistExecutionViewProps {
@@ -51,6 +57,17 @@ export const ChecklistExecutionView: React.FC<ChecklistExecutionViewProps> = ({
 
   const defaultDocNumber = `ITDC-${todayStr.replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
 
+  // Shift state: strictly Morning Shift, Afternoon Shift, All Day Routine
+  const [shift, setShift] = useState<'Morning Shift' | 'Afternoon Shift' | 'All Day Routine'>(
+    (initialDraft?.shift as any) || 'Morning Shift'
+  );
+
+  // Inspectors management state
+  const [inspectors, setInspectors] = useState<InspectorProfile[]>(() => storageService.getInspectors());
+  const [isInspectorModalOpen, setIsInspectorModalOpen] = useState(false);
+  const [newInspName, setNewInspName] = useState('');
+  const [newInspRole, setNewInspRole] = useState('IT Operations Specialist');
+
   // Inspection Header state
   const [inspectionNumber, setInspectionNumber] = useState<string>(
     initialDraft?.inspectionNumber || defaultDocNumber
@@ -61,15 +78,22 @@ export const ChecklistExecutionView: React.FC<ChecklistExecutionViewProps> = ({
   const [inspectionTime, setInspectionTime] = useState<string>(
     initialDraft?.inspectionTime || currentTimeStr
   );
-  const [shift, setShift] = useState<'Morning' | 'Middle' | 'Night' | 'Full Day'>(
-    initialDraft?.shift || 'Morning'
+
+  // Default inspector to active user if they match one of our superusers, else Leonardo Bobby
+  const initialInspectorName = initialDraft?.inspectorName || (
+    currentUser.email.toLowerCase().includes('itc') || currentUser.name.includes('Aditya')
+      ? 'Muchammed Aditya'
+      : 'Leonardo Bobby'
   );
-  const [inspectorName, setInspectorName] = useState<string>(
-    initialDraft?.inspectorName || (currentUser.isSuperuser ? currentUser.name : 'Leonardo Bobby')
+  const initialInspectorRole = initialDraft?.inspectorRole || (
+    currentUser.email.toLowerCase().includes('itc') || currentUser.name.includes('Aditya')
+      ? 'IT Coordinator'
+      : 'Cluster IT Manager'
   );
-  const [inspectorRole, setInspectorRole] = useState<string>(
-    initialDraft?.inspectorRole || (currentUser.isSuperuser ? currentUser.role : 'Cluster IT Manager')
-  );
+
+  const [inspectorName, setInspectorName] = useState<string>(initialInspectorName);
+  const [inspectorRole, setInspectorRole] = useState<string>(initialInspectorRole);
+
   const [summaryNotes, setSummaryNotes] = useState<string>(
     initialDraft?.notes || ''
   );
@@ -241,6 +265,31 @@ export const ChecklistExecutionView: React.FC<ChecklistExecutionViewProps> = ({
       });
       return updated;
     });
+  };
+
+  // INSPECTORS MANAGEMENT HANDLERS (Fixed Leonardo Bobby, Muchammed Aditya + Custom)
+  const handleAddInspector = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newInspName.trim()) return;
+    const created = storageService.addCustomInspector(newInspName.trim(), newInspRole.trim());
+    const updated = storageService.getInspectors();
+    setInspectors(updated);
+    setInspectorName(created.name);
+    setInspectorRole(created.role);
+    setNewInspName('');
+    setIsInspectorModalOpen(false);
+  };
+
+  const handleDeleteCustomInspector = (id: string, name: string) => {
+    if (window.confirm(`Remove inspector "${name}" from the active selection list?\n\n(Important: Historical checklist records that were conducted by ${name} will NOT be deleted).`)) {
+      storageService.deleteCustomInspector(id);
+      const updated = storageService.getInspectors();
+      setInspectors(updated);
+      if (inspectorName === name) {
+        setInspectorName('Leonardo Bobby');
+        setInspectorRole('Cluster IT Manager');
+      }
+    }
   };
 
   // MANUAL ITEM MANAGEMENT HANDLERS (Add, Edit, Delete right on the checklist)
@@ -449,78 +498,181 @@ export const ChecklistExecutionView: React.FC<ChecklistExecutionViewProps> = ({
           </div>
         </div>
 
-        {/* Input Parameters Form with Document No & Exact Time */}
+        {/* PINNED SHIFT SELECTION BAR (Pinned to Top) */}
+        <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-2">
+            <span className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-emerald-600" />
+              <span>Operational Shift (Pinned to Top)</span>
+            </span>
+            <span className="text-[11px] text-slate-500">
+              Active Shift: <strong className="text-slate-900">{shift}</strong>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <button
+              type="button"
+              disabled={!currentUser.isSuperuser}
+              onClick={() => currentUser.isSuperuser && setShift('Morning Shift')}
+              className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                shift === 'Morning Shift'
+                  ? 'bg-amber-500/10 border-amber-500 text-amber-950 font-bold ring-2 ring-amber-500/20'
+                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+              } ${!currentUser.isSuperuser ? 'cursor-not-allowed opacity-85' : ''}`}
+            >
+              <div className={`p-2 rounded-lg shrink-0 ${shift === 'Morning Shift' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-amber-600'}`}>
+                <Sun className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold leading-tight">Morning Shift</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">07:00 – 16:00 (Opening &amp; Core Systems)</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              disabled={!currentUser.isSuperuser}
+              onClick={() => currentUser.isSuperuser && setShift('Afternoon Shift')}
+              className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                shift === 'Afternoon Shift'
+                  ? 'bg-sky-500/10 border-sky-500 text-sky-950 font-bold ring-2 ring-sky-500/20'
+                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+              } ${!currentUser.isSuperuser ? 'cursor-not-allowed opacity-85' : ''}`}
+            >
+              <div className={`p-2 rounded-lg shrink-0 ${shift === 'Afternoon Shift' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-sky-600'}`}>
+                <Sunset className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold leading-tight">Afternoon Shift</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">14:00 – 23:00 (Peak Operations &amp; Events)</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              disabled={!currentUser.isSuperuser}
+              onClick={() => currentUser.isSuperuser && setShift('All Day Routine')}
+              className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                shift === 'All Day Routine'
+                  ? 'bg-indigo-500/10 border-indigo-500 text-indigo-950 font-bold ring-2 ring-indigo-500/20'
+                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+              } ${!currentUser.isSuperuser ? 'cursor-not-allowed opacity-85' : ''}`}
+            >
+              <div className={`p-2 rounded-lg shrink-0 ${shift === 'All Day Routine' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-indigo-600'}`}>
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold leading-tight">All Day Routine</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">Full Day 24h Summary Audit</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Input Parameters Form with Document No & Exact Time & Inspector Picker */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3.5 text-xs">
-          {/* Inspection Reference Number */}
+          {/* Checklist Reference Number */}
           <div className="lg:col-span-2">
             <label className="block font-semibold text-slate-800 mb-1 flex items-center gap-1">
               <Hash className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Inspection Ref No. (Document ID)</span>
+              <span>Checklist Ref No. (Document ID)</span>
             </label>
             <input
               type="text"
+              readOnly={!currentUser.isSuperuser}
               value={inspectionNumber}
               onChange={(e) => setInspectionNumber(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono font-bold focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
             />
           </div>
 
-          {/* Date */}
+          {/* Checklist Date */}
           <div>
             <label className="block font-medium text-slate-700 mb-1">
-              Audit Date
+              Checklist Date
             </label>
             <input
               type="date"
+              readOnly={!currentUser.isSuperuser}
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-hidden font-mono"
             />
           </div>
 
-          {/* Inspection Time */}
+          {/* Checklist Time */}
           <div>
             <label className="block font-medium text-slate-700 mb-1 flex items-center gap-1">
               <Clock className="w-3 h-3 text-slate-400" />
-              <span>Inspection Time</span>
+              <span>Checklist Time</span>
             </label>
             <input
               type="text"
+              readOnly={!currentUser.isSuperuser}
               value={inspectionTime}
               onChange={(e) => setInspectionTime(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white font-mono"
             />
           </div>
 
-          {/* Operational Shift */}
-          <div>
-            <label className="block font-medium text-slate-700 mb-1">
-              Shift
-            </label>
-            <select
-              value={shift}
-              onChange={(e) => setShift(e.target.value as any)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white font-medium"
-            >
-              <option value="Morning">Morning Shift</option>
-              <option value="Middle">Middle Shift</option>
-              <option value="Night">Night Shift</option>
-              <option value="Full Day">Full Day Routine</option>
-            </select>
-          </div>
+          {/* Inspector Name Picker with Fixed Superusers & Add New */}
+          <div className="lg:col-span-2">
+            <div className="flex items-center justify-between mb-1">
+              <label className="font-semibold text-slate-800 flex items-center gap-1">
+                <Users className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Inspector Name</span>
+              </label>
+              {currentUser.isSuperuser && (
+                <button
+                  type="button"
+                  onClick={() => setIsInspectorModalOpen(true)}
+                  className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 hover:underline"
+                >
+                  <UserPlus className="w-3 h-3" />
+                  <span>+ New Inspector</span>
+                </button>
+              )}
+            </div>
 
-          {/* Inspector Name */}
-          <div>
-            <label className="block font-medium text-slate-700 mb-1">
-              Inspector Name
-            </label>
-            <input
-              type="text"
-              value={inspectorName}
-              onChange={(e) => setInspectorName(e.target.value)}
-              placeholder="e.g. Bayu Pratama"
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white"
-            />
+            <div className="space-y-1">
+              <select
+                disabled={!currentUser.isSuperuser}
+                value={inspectorName}
+                onChange={(e) => {
+                  const selected = inspectors.find((i) => i.name === e.target.value);
+                  if (selected) {
+                    setInspectorName(selected.name);
+                    setInspectorRole(selected.role);
+                  } else {
+                    setInspectorName(e.target.value);
+                  }
+                }}
+                className={`w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white font-medium ${
+                  !currentUser.isSuperuser ? 'cursor-not-allowed opacity-85' : ''
+                }`}
+              >
+                <optgroup label="Fixed Designated Superusers">
+                  <option value="Leonardo Bobby">Leonardo Bobby (Cluster IT Manager)</option>
+                  <option value="Muchammed Aditya">Muchammed Aditya (IT Coordinator)</option>
+                </optgroup>
+                {inspectors.filter((i) => i.isCustom).length > 0 && (
+                  <optgroup label="Additional Registered Inspectors">
+                    {inspectors.filter((i) => i.isCustom).map((i) => (
+                      <option key={i.id} value={i.name}>
+                        {i.name} ({i.role})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              <div className="text-[10px] text-slate-500 font-medium px-1 flex items-center justify-between">
+                <span>Role: <strong>{inspectorRole}</strong></span>
+                {inspectors.some((i) => i.name === inspectorName && i.isCustom) && (
+                  <span className="text-amber-600">Custom Profile</span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1057,6 +1209,117 @@ export const ChecklistExecutionView: React.FC<ChecklistExecutionViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 7. MODAL FOR REGISTERING NEW INSPECTOR / MANAGING INSPECTORS */}
+      {isInspectorModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Register New Inspector
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Manage IT inspectors for daily checklist sign-off.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsInspectorModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Add New Inspector Form */}
+            <form onSubmit={handleAddInspector} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Inspector Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Bayu Pratama"
+                  value={newInspName}
+                  onChange={(e) => setNewInspName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Job Role / Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. IT Operations Specialist"
+                  value={newInspRole}
+                  onChange={(e) => setNewInspRole(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-1.5"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Save New Inspector</span>
+              </button>
+            </form>
+
+            {/* Current Inspectors List & Deletion */}
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Current Registered Inspectors
+              </span>
+              <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 text-xs">
+                {inspectors.map((insp) => (
+                  <div key={insp.id} className="py-2 flex items-center justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+                        <span>{insp.name}</span>
+                        {!insp.isCustom ? (
+                          <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 text-[10px] rounded font-bold">
+                            Designated Superuser
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 text-[10px] rounded font-medium">
+                            Custom
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500">{insp.role}</div>
+                    </div>
+
+                    {insp.isCustom && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCustomInspector(insp.id, insp.name)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Delete inspector from dropdown (Past checklist records are kept safe)"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-400 leading-tight pt-1">
+                🛡️ <em>Safety Guarantee:</em> Deleting a custom inspector only removes them from the dropdown list. Historical inspection records and reports previously saved will never be deleted.
+              </p>
+            </div>
           </div>
         </div>
       )}
